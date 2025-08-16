@@ -8,3 +8,5 @@ __pycache__/
 *.pywz
 *.pyzw
 *.pyzwz
+chroma_db/
+commands.db

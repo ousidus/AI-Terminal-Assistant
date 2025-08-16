@@ -54,36 +54,90 @@ pip3 install -r requirements.txt --break-system-packages
    chmod +x ask.py
    ```
 
-## Usage
+## 🚀 Features
 
-**Note:** If using a virtual environment, make sure to activate it first:
+- 🤖 **RAG-Enhanced AI**: Uses vector similarity search to find relevant commands from knowledge base
+- 🔒 **Safety Sandbox**: Automatic sandbox execution for risky commands with Docker isolation
+- 📜 **Query History**: Tracks all queries and execution results
+- 🎯 **Dry Run Mode**: Preview commands before execution
+- 🧠 **Learning System**: Continuously learns from new commands
+- ⚡ **Multiple Execution Modes**: Normal, sandbox, or dry-run
+- 🎨 **Beautiful CLI**: Rich colors, panels, and progress indicators
+
+## 📖 Usage
+
+**Note:** If using a virtual environment, activate it first:
 ```bash
 source venv/bin/activate
 ```
 
-### Generate a command (without executing):
+### 🔍 Basic Command Generation
 ```bash
+# Generate command (no execution)
 ./ask.py "list all files in current directory"
-# Output: Generated command: ls -la
+
+# Show similar commands from knowledge base
+./ask.py "find large files" --show-similar
 ```
 
-### Generate and execute a command:
+### ⚡ Execution Modes
 ```bash
+# Execute immediately (with confirmation)
 ./ask.py "show disk usage" --execute
-# Output: Generated command: df -h
-# Executing command...
-# [command output]
-# Done!
+
+# Dry run mode (preview only)
+./ask.py "delete all temp files" --dry-run
+
+# Force sandbox execution (safe)
+./ask.py "install packages" --sandbox
 ```
 
-### More examples:
+### 📜 History Management
 ```bash
-./ask.py "find all Python files"
-./ask.py "show running processes"
-./ask.py "create a directory called test"
-./ask.py "compress folder mydata into a zip file" --execute
+# View recent queries
+./ask.py history
+
+# Limit history results
+./ask.py history --limit 5
 ```
 
-## Safety Note
+### 🧠 Knowledge Base
+```bash
+# Search similar commands
+./ask.py search "file operations"
 
-Always review the generated command before using `--execute` to ensure it's safe and correct.
+# Add command to knowledge base
+./ask.py learn "show memory usage" "free -h" --description "Display memory usage" --safety 1
+
+# Clean up sandbox resources
+./ask.py cleanup
+```
+
+### 🎯 Advanced Examples
+```bash
+# Risky command with automatic sandbox
+./ask.py "remove all log files" --execute
+# ⚠️ Automatically detects risk and uses sandbox
+
+# Learning from interaction
+./ask.py "backup my documents" --execute
+# 🧠 Adds successful commands to knowledge base
+
+# Multiple options
+./ask.py "compress large directory" --dry-run --show-similar
+# 🔍 Shows similar commands + preview without execution
+```
+
+## 🔒 Safety Features
+
+- **Automatic Risk Detection**: Commands are analyzed for danger level (1-5)
+- **Sandbox Execution**: High-risk commands run in isolated Docker containers
+- **Confirmation Prompts**: Always asks before executing commands
+- **Process Limits**: CPU and memory restrictions in sandbox mode
+- **Read-only Filesystem**: Sandbox prevents system modifications
+
+### Safety Levels:
+- 🟢 **Level 1-2**: Safe commands (ls, cat, etc.)
+- 🟡 **Level 3**: Moderate risk (sudo, file moves)
+- 🟠 **Level 4**: High risk (kill processes, chmod 777)
+- 🔴 **Level 5**: Extremely dangerous (rm -rf, disk formatting)
