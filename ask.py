@@ -12,12 +12,10 @@ from rich.text import Text
 from rich.prompt import Confirm
 from rich import print as rprint
 
-# --- Configuration ---
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 console = Console()
 
 def print_banner():
-    """Display a beautiful banner"""
     banner = """
     ╔══════════════════════════════════════════════════════════════╗
     ║                   AI Terminal Assistant                      ║
@@ -34,14 +32,11 @@ def generate_command(prompt):
         console.print("2. Run: export GEMINI_API_KEY=\"your_api_key_here\"")
         sys.exit(1)
     
-    # Show loading spinner
     with console.status("[bold green]🤖 Thinking... Generating command", spinner="dots"):
         try:
-            # Configure Gemini
             genai.configure(api_key=GEMINI_API_KEY)
             model = genai.GenerativeModel('gemini-1.5-pro')
             
-            # Create a more specific prompt for better results
             system_prompt = f"""
             You are a Linux/macOS command expert. Convert the following natural language request into a single terminal command.
             Only respond with the command itself, no explanations or additional text.
@@ -51,7 +46,7 @@ def generate_command(prompt):
             """
             
             response = model.generate_content(system_prompt)
-            time.sleep(0.5)  # Small delay for better UX
+            time.sleep(0.5)  
             return response.text.strip()
             
         except Exception as e:
@@ -78,7 +73,6 @@ def main():
     try:
         cmd = generate_command(args.query)
         
-        # Display generated command in a beautiful panel
         cmd_panel = Panel(
             f"[bold green]{cmd}[/bold green]",
             title="[bold yellow]⚡ Generated Command[/bold yellow]",
@@ -88,13 +82,11 @@ def main():
         console.print(cmd_panel)
 
         if args.execute:
-            # Ask for confirmation with a nice prompt
             console.print("\n[bold yellow]⚠️  About to execute this command...[/bold yellow]")
             
             if Confirm.ask("[bold cyan]Do you want to proceed?[/bold cyan]", default=True):
                 console.print("\n[bold green]🚀 Executing command...[/bold green]")
                 
-                # Show execution with spinner
                 with console.status("[bold blue]Running command...", spinner="bouncingBar"):
                     result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
                 
