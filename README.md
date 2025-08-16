@@ -1,4 +1,4 @@
-# AuroraOS - AI Terminal Assistant
+# AI Terminal Assistant
 
 A natural language command generator using Google's Gemini AI.
 
