@@ -1,7 +1,4 @@
 #!/usr/bin/env python3
-"""
-RAG Vector Store for command knowledge base
-"""
 import os
 import json
 import faiss
@@ -16,17 +13,15 @@ class CommandRAGStore:
         self.db_path = db_path
         self.vector_dim = vector_dim
         self.model = SentenceTransformer('all-MiniLM-L6-v2')
-        self.index = faiss.IndexFlatIP(vector_dim)  # Inner product for similarity
+        self.index = faiss.IndexFlatIP(vector_dim)
         
         self._init_database()
         self._load_default_commands()
     
     def _init_database(self):
-        """Initialize SQLite database for command storage"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
-        # Commands table
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS commands (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -39,7 +34,6 @@ class CommandRAGStore:
             )
         ''')
         
-        # Query history table
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS query_history (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -55,7 +49,6 @@ class CommandRAGStore:
         conn.close()
     
     def _load_default_commands(self):
-        """Load default command knowledge base"""
         default_commands = [
             {
                 "query": "list files in directory",
@@ -115,14 +108,12 @@ class CommandRAGStore:
             }
         ]
         
-        # Check if commands already exist
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) FROM commands")
         count = cursor.fetchone()[0]
         
         if count == 0:
-            # Add default commands
             for cmd in default_commands:
                 self.add_command(**cmd)
         
@@ -131,7 +122,6 @@ class CommandRAGStore:
     
     def add_command(self, query: str, command: str, description: str = "", 
                    category: str = "general", safety_level: int = 1):
-        """Add a new command to the knowledge base"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
@@ -143,11 +133,9 @@ class CommandRAGStore:
         conn.commit()
         conn.close()
         
-        # Update vector index
         self._rebuild_index()
     
     def _rebuild_index(self):
-        """Rebuild FAISS index with all commands"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
@@ -158,33 +146,25 @@ class CommandRAGStore:
         if not commands:
             return
         
-        # Create embeddings
-        texts = [f"{cmd[1]} {cmd[2]}" for cmd in commands]  # query + description
+        texts = [f"{cmd[1]} {cmd[2]}" for cmd in commands]
         embeddings = self.model.encode(texts)
         
-        # Normalize embeddings for cosine similarity
         embeddings = embeddings / np.linalg.norm(embeddings, axis=1, keepdims=True)
         
-        # Rebuild index
         self.index = faiss.IndexFlatIP(self.vector_dim)
         self.index.add(embeddings.astype('float32'))
         
-        # Store command IDs for retrieval
         self.command_ids = [cmd[0] for cmd in commands]
     
     def search_similar_commands(self, query: str, top_k: int = 3) -> List[Dict]:
-        """Search for similar commands using vector similarity"""
         if self.index.ntotal == 0:
             return []
         
-        # Encode query
         query_embedding = self.model.encode([query])
         query_embedding = query_embedding / np.linalg.norm(query_embedding, axis=1, keepdims=True)
         
-        # Search
         scores, indices = self.index.search(query_embedding.astype('float32'), top_k)
         
-        # Retrieve commands
         results = []
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -215,7 +195,6 @@ class CommandRAGStore:
     
     def add_to_history(self, user_query: str, generated_command: str, 
                       executed: bool = False, success: bool = None):
-        """Add query to history"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
@@ -228,7 +207,6 @@ class CommandRAGStore:
         conn.close()
     
     def get_history(self, limit: int = 10) -> List[Dict]:
-        """Get recent query history"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
@@ -252,8 +230,7 @@ class CommandRAGStore:
         conn.close()
         return results
     
-    def get_safety_level(self, command: str) -> int:
-        """Analyze command safety level"""
+    def get_safety_level(self, command: str) -> int: 
         dangerous_patterns = {
             5: ['rm -rf', 'mkfs', 'dd if=', 'format', 'fdisk', '>/dev/'],
             4: ['kill -9', 'pkill', 'killall', 'sudo rm', 'chmod 777'],
@@ -267,4 +244,4 @@ class CommandRAGStore:
                 if pattern in command_lower:
                     return level
         
-        return 1  # Safe by default
+        return 1

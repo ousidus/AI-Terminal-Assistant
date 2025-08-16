@@ -1,7 +1,4 @@
 #!/usr/bin/env python3
-"""
-Enhanced CLI commands for ChromaDB RAG system
-"""
 import click
 from rich.console import Console
 from rich.table import Table
@@ -16,7 +13,6 @@ console = Console()
 
 @click.group()
 def rag_cli():
-    """🧠 RAG Knowledge Base Management"""
     pass
 
 @rag_cli.command()
@@ -24,10 +20,8 @@ def rag_cli():
 @click.option('--min-safety', type=int, default=1, help='Minimum safety level to show')
 @click.option('--max-safety', type=int, default=5, help='Maximum safety level to show')
 def list_commands(category, min_safety, max_safety):
-    """📋 List all commands in the knowledge base"""
     rag = ChromaCommandRAG()
     
-    # Get statistics first
     stats = rag.get_command_statistics()
     
     console.print(f"[bold blue]📊 Knowledge Base Statistics[/bold blue]")
@@ -35,7 +29,6 @@ def list_commands(category, min_safety, max_safety):
     console.print(f"Total Queries: [cyan]{stats['total_queries']}[/cyan]")
     console.print(f"Success Rate: [green]{(stats['successful_executions']/max(stats['executed_queries'], 1)*100):.1f}%[/green]\n")
     
-    # Show categories
     if stats['categories']:
         table = Table(title="📂 Commands by Category", show_header=True, header_style="bold magenta")
         table.add_column("Category", style="cyan")
@@ -68,7 +61,6 @@ def list_commands(category, min_safety, max_safety):
 @click.option('--top-k', '-k', default=5, help='Number of similar commands to show')
 @click.option('--min-similarity', '-s', default=0.3, type=float, help='Minimum similarity threshold')
 def search_detailed(query, top_k, min_similarity):
-    """🔍 Detailed search with similarity scores and metadata"""
     rag = ChromaCommandRAG()
     
     console.print(f"[bold blue]🔍 Searching for:[/bold blue] [cyan]'{query}'[/cyan]\n")
@@ -87,7 +79,6 @@ def search_detailed(query, top_k, min_similarity):
         return
     
     for i, cmd in enumerate(results, 1):
-        # Color coding based on similarity
         if cmd['similarity_score'] >= 0.8:
             border_color = "green"
             score_color = "bold green"
@@ -98,11 +89,9 @@ def search_detailed(query, top_k, min_similarity):
             border_color = "red"
             score_color = "bold red"
         
-        # Safety level styling
         safety_level = cmd['safety_level']
         safety_color = "green" if safety_level <= 2 else "yellow" if safety_level <= 3 else "red"
         
-        # Create detailed panel
         content = f"""[bold]Query:[/bold] {cmd['query']}
 [bold]Command:[/bold] [green]{cmd['command']}[/green]
 [bold]Description:[/bold] {cmd['description']}
@@ -130,10 +119,8 @@ def search_detailed(query, top_k, min_similarity):
 @click.option('--description', '-d', default="", help='Updated description')
 @click.option('--safety', '-s', default=1, type=int, help='Safety level (1-5)')
 def update_command(old_query, new_query, new_command, description, safety):
-    """✏️ Update an existing command in the knowledge base"""
     rag = ChromaCommandRAG()
     
-    # Search for the command to update
     results = rag.search_similar_commands(old_query, top_k=1, min_similarity=0.9)
     
     if not results:
@@ -142,7 +129,6 @@ def update_command(old_query, new_query, new_command, description, safety):
     
     console.print(f"[yellow]📝 Updating command...[/yellow]")
     
-    # Add the new version (ChromaDB will handle the update)
     cmd_id = rag.add_command(new_query, new_command, description, "updated", safety)
     
     console.print(f"[green]✅ Command updated successfully![/green]")
@@ -150,12 +136,10 @@ def update_command(old_query, new_query, new_command, description, safety):
 
 @rag_cli.command()
 def export_knowledge():
-    """📤 Export knowledge base to JSON file"""
     rag = ChromaCommandRAG()
     
     console.print("[blue]📤 Exporting knowledge base...[/blue]")
     
-    # Get all commands by searching with a broad query
     all_commands = rag.search_similar_commands("command", top_k=1000, min_similarity=0.0)
     
     export_data = {
@@ -219,7 +203,6 @@ def import_knowledge(filename):
 @rag_cli.command()
 @click.confirmation_option(prompt='Are you sure you want to reset the entire knowledge base?')
 def reset():
-    """🗑️ Reset the entire knowledge base (DANGEROUS)"""
     rag = ChromaCommandRAG()
     
     console.print("[red]🗑️ Resetting knowledge base...[/red]")

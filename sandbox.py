@@ -1,7 +1,4 @@
 #!/usr/bin/env python3
-"""
-Safety sandbox for risky commands
-"""
 import docker
 import psutil
 import subprocess
@@ -23,10 +20,6 @@ class CommandSandbox:
             console.print("[yellow]⚠️ Docker not available. Sandbox mode will use process isolation.[/yellow]")
     
     def is_risky_command(self, command: str) -> Tuple[bool, int, str]:
-        """
-        Check if command is risky
-        Returns: (is_risky, safety_level, reason)
-        """
         dangerous_patterns = {
             'rm -rf': (5, "Recursive deletion - can destroy entire filesystem"),
             'mkfs': (5, "Disk formatting - will destroy all data on device"),
@@ -51,27 +44,24 @@ class CommandSandbox:
         return False, 1, "Command appears safe"
     
     def run_in_docker_sandbox(self, command: str) -> Dict:
-        """Run command in Docker container sandbox"""
         if not self.docker_client:
             return {"error": "Docker not available"}
         
         try:
-            # Create a minimal Ubuntu container
             container = self.docker_client.containers.run(
                 "ubuntu:20.04",
                 command=f"/bin/bash -c '{command}'",
                 name=f"{self.container_name}-{os.getpid()}",
                 detach=True,
                 remove=True,
-                network_mode="none",  # No network access
-                mem_limit="128m",     # Limit memory
-                cpu_period=100000,    # Limit CPU
-                cpu_quota=50000,      # 50% CPU max
-                read_only=True,       # Read-only filesystem
-                tmpfs={"/tmp": "rw,size=100m"}  # Small writable tmp
+                network_mode="none",
+                mem_limit="128m",
+                cpu_period=100000,
+                cpu_quota=50000,
+                read_only=True,
+                tmpfs={"/tmp": "rw,size=100m"}
             )
             
-            # Wait for completion with timeout
             result = container.wait(timeout=30)
             logs = container.logs().decode('utf-8')
             
@@ -95,16 +85,12 @@ class CommandSandbox:
             }
     
     def run_with_process_limits(self, command: str) -> Dict:
-        """Run command with process limitations"""
         try:
-            # Create temporary directory for isolation
             with tempfile.TemporaryDirectory() as temp_dir:
-                # Set environment variables for isolation
                 env = os.environ.copy()
                 env['HOME'] = temp_dir
                 env['TMPDIR'] = temp_dir
                 
-                # Run with timeout and resource limits
                 process = subprocess.Popen(
                     command,
                     shell=True,
@@ -116,13 +102,10 @@ class CommandSandbox:
                 )
                 
                 try:
-                    # Set process limits if possible
                     ps_process = psutil.Process(process.pid)
-                    # ps_process.nice(19)  # Lower priority
                 except:
                     pass
                 
-                # Wait with timeout
                 stdout, stderr = process.communicate(timeout=30)
                 
                 return {
@@ -146,14 +129,6 @@ class CommandSandbox:
             }
     
     def safe_execute(self, command: str, force_sandbox: bool = False) -> Dict:
-        """
-        Execute command safely
-        Args:
-            command: Command to execute
-            force_sandbox: Force sandbox even for safe commands
-        Returns:
-            Dict with execution results
-        """
         is_risky, safety_level, reason = self.is_risky_command(command)
         
         result = {
@@ -165,12 +140,10 @@ class CommandSandbox:
             "execution_result": None
         }
         
-        # Use sandbox for risky commands or when forced
         if is_risky or force_sandbox:
             console.print(f"[yellow]🔒 Running in sandbox mode: {reason}[/yellow]")
             result["sandbox_used"] = True
             
-            # Try Docker first, fall back to process isolation
             if self.docker_client:
                 execution_result = self.run_in_docker_sandbox(command)
             else:
@@ -178,7 +151,7 @@ class CommandSandbox:
             
             result["execution_result"] = execution_result
         else:
-            # Run normally for safe commands
+
             try:
                 process = subprocess.run(
                     command,
@@ -209,10 +182,8 @@ class CommandSandbox:
         return result
     
     def cleanup(self):
-        """Clean up sandbox resources"""
         if self.docker_client:
             try:
-                # Remove any leftover containers
                 containers = self.docker_client.containers.list(
                     all=True,
                     filters={"name": self.container_name}

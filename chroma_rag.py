@@ -1,7 +1,4 @@
 #!/usr/bin/env python3
-"""
-ChromaDB-based RAG Vector Store for command knowledge base
-"""
 import os
 import json
 import chromadb
@@ -15,7 +12,6 @@ class ChromaCommandRAG:
         self.db_path = db_path
         self.chroma_path = chroma_path
         
-        # Initialize ChromaDB
         self.chroma_client = chromadb.PersistentClient(
             path=chroma_path,
             settings=Settings(
@@ -24,7 +20,6 @@ class ChromaCommandRAG:
             )
         )
         
-        # Get or create collection
         self.collection = self.chroma_client.get_or_create_collection(
             name="command_knowledge",
             metadata={"description": "Terminal commands knowledge base"},
@@ -35,11 +30,9 @@ class ChromaCommandRAG:
         self._load_default_commands()
     
     def _init_database(self):
-        """Initialize SQLite database for additional metadata and history"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
-        # Commands metadata table
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS commands_metadata (
                 id TEXT PRIMARY KEY,
@@ -55,7 +48,6 @@ class ChromaCommandRAG:
             )
         ''')
         
-        # Query history table
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS query_history (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -68,7 +60,6 @@ class ChromaCommandRAG:
             )
         ''')
         
-        # Performance metrics table
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS performance_metrics (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -84,7 +75,6 @@ class ChromaCommandRAG:
         conn.close()
     
     def _load_default_commands(self):
-        """Load default command knowledge base into ChromaDB"""
         default_commands = [
             {
                 "query": "list files in directory",
@@ -200,12 +190,10 @@ class ChromaCommandRAG:
             }
         ]
         
-        # Check if collection is empty
         if self.collection.count() == 0:
             self._batch_add_commands(default_commands)
     
     def _batch_add_commands(self, commands: List[Dict]):
-        """Add multiple commands to ChromaDB in batch"""
         documents = []
         metadatas = []
         ids = []
@@ -216,11 +204,9 @@ class ChromaCommandRAG:
         for i, cmd in enumerate(commands):
             cmd_id = f"cmd_{i}_{hash(cmd['query'] + cmd['command']) % 10000}"
             
-            # Prepare document for embedding (query + description + command)
             document = f"Query: {cmd['query']} Description: {cmd['description']} Command: {cmd['command']}"
             documents.append(document)
             
-            # Prepare metadata for ChromaDB
             metadata = {
                 "query": cmd["query"],
                 "command": cmd["command"],
@@ -230,7 +216,6 @@ class ChromaCommandRAG:
             metadatas.append(metadata)
             ids.append(cmd_id)
             
-            # Store additional metadata in SQLite
             cursor.execute('''
                 INSERT OR REPLACE INTO commands_metadata 
                 (id, query, command, description, category, safety_level)
@@ -238,7 +223,6 @@ class ChromaCommandRAG:
             ''', (cmd_id, cmd["query"], cmd["command"], cmd["description"], 
                   cmd["category"], cmd["safety_level"]))
         
-        # Add to ChromaDB
         self.collection.add(
             documents=documents,
             metadatas=metadatas,
@@ -250,13 +234,10 @@ class ChromaCommandRAG:
     
     def add_command(self, query: str, command: str, description: str = "", 
                    category: str = "user", safety_level: int = 1) -> str:
-        """Add a single command to the knowledge base"""
         cmd_id = f"user_{hash(query + command + str(datetime.now().timestamp())) % 100000}"
         
-        # Prepare document for embedding
         document = f"Query: {query} Description: {description} Command: {command}"
         
-        # Add to ChromaDB
         self.collection.add(
             documents=[document],
             metadatas=[{
@@ -268,7 +249,6 @@ class ChromaCommandRAG:
             ids=[cmd_id]
         )
         
-        # Store in SQLite
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute('''
@@ -283,11 +263,9 @@ class ChromaCommandRAG:
     
     def search_similar_commands(self, query: str, top_k: int = 5, 
                               min_similarity: float = 0.5) -> List[Dict]:
-        """Search for similar commands using ChromaDB vector similarity"""
         if self.collection.count() == 0:
             return []
         
-        # Search in ChromaDB
         results = self.collection.query(
             query_texts=[query],
             n_results=min(top_k, self.collection.count()),
@@ -297,19 +275,16 @@ class ChromaCommandRAG:
         if not results["documents"] or not results["documents"][0]:
             return []
         
-        # Process results
         similar_commands = []
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
         for i, (metadata, distance) in enumerate(zip(results["metadatas"][0], results["distances"][0])):
-            # Convert distance to similarity score (ChromaDB returns distances, lower is better)
             similarity_score = 1.0 / (1.0 + distance)
             
             if similarity_score < min_similarity:
                 continue
             
-            # Get additional metadata from SQLite
             cursor.execute('''
                 SELECT description, usage_count, success_rate, last_used
                 FROM commands_metadata WHERE query = ? AND command = ?
@@ -334,17 +309,14 @@ class ChromaCommandRAG:
         
         conn.close()
         
-        # Sort by similarity score (highest first)
         similar_commands.sort(key=lambda x: x["similarity_score"], reverse=True)
         
         return similar_commands
     
     def update_command_usage(self, command_id: str, success: bool = True, execution_time: float = None):
-        """Update command usage statistics"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
-        # Update usage statistics
         cursor.execute('''
             UPDATE commands_metadata 
             SET usage_count = usage_count + 1,
@@ -359,7 +331,6 @@ class ChromaCommandRAG:
     def add_to_history(self, user_query: str, generated_command: str, 
                       executed: bool = False, success: bool = None, 
                       execution_time: float = None):
-        """Add query to history with enhanced tracking"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
@@ -373,7 +344,6 @@ class ChromaCommandRAG:
         conn.close()
     
     def get_history(self, limit: int = 10) -> List[Dict]:
-        """Get recent query history with enhanced information"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
@@ -400,11 +370,9 @@ class ChromaCommandRAG:
         return results
     
     def get_command_statistics(self) -> Dict:
-        """Get overall statistics about the knowledge base"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
-        # Command count by category
         cursor.execute('''
             SELECT category, COUNT(*), AVG(safety_level), AVG(success_rate)
             FROM commands_metadata 
@@ -412,10 +380,8 @@ class ChromaCommandRAG:
         ''')
         categories = cursor.fetchall()
         
-        # Total commands
         total_commands = self.collection.count()
         
-        # History statistics
         cursor.execute('''
             SELECT COUNT(*), 
                    SUM(CASE WHEN executed = 1 THEN 1 ELSE 0 END),
@@ -438,7 +404,6 @@ class ChromaCommandRAG:
         }
     
     def get_safety_level(self, command: str) -> int:
-        """Analyze command safety level with enhanced patterns"""
         dangerous_patterns = {
             5: ['rm -rf', 'mkfs', 'dd if=', 'format', 'fdisk', '>/dev/', 'sudo dd', 'wipefs'],
             4: ['kill -9', 'pkill', 'killall', 'sudo rm', 'chmod 777', 'chown -R', 'sudo chmod'],
@@ -452,19 +417,15 @@ class ChromaCommandRAG:
                 if pattern in command_lower:
                     return level
         
-        return 1  # Safe by default
+        return 1
     
     def cleanup(self):
-        """Clean up ChromaDB resources"""
         try:
-            # ChromaDB handles cleanup automatically
             pass
         except Exception:
             pass
     
     def reset_database(self):
-        """Reset the entire knowledge base (use with caution)"""
-        # Reset ChromaDB collection
         self.chroma_client.delete_collection("command_knowledge")
         self.collection = self.chroma_client.get_or_create_collection(
             name="command_knowledge",
@@ -472,7 +433,6 @@ class ChromaCommandRAG:
             embedding_function=chromadb.utils.embedding_functions.DefaultEmbeddingFunction()
         )
         
-        # Reset SQLite database
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute("DELETE FROM commands_metadata")
@@ -481,5 +441,4 @@ class ChromaCommandRAG:
         conn.commit()
         conn.close()
         
-        # Reload default commands
         self._load_default_commands()

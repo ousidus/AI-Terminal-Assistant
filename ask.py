@@ -59,7 +59,6 @@ def show_similar_commands(query: str, show_output: bool = True):
     return similar
 
 def generate_command_with_rag(prompt: str) -> str:
-    """Generate command using RAG-enhanced prompting"""
     if not GEMINI_API_KEY:
         console.print("[bold red]❌ Error:[/bold red] GEMINI_API_KEY environment variable is not set")
         console.print("\n[yellow]💡 To fix this:[/yellow]")
@@ -67,7 +66,6 @@ def generate_command_with_rag(prompt: str) -> str:
         console.print("2. Run: export GEMINI_API_KEY=\"your_api_key_here\"")
         sys.exit(1)
     
-    # Search for similar commands in RAG store
     similar_commands = rag_store.search_similar_commands(prompt, top_k=3)
     
     with console.status("[bold green]🤖 Thinking... Generating command with RAG", spinner="dots"):
@@ -75,7 +73,6 @@ def generate_command_with_rag(prompt: str) -> str:
             genai.configure(api_key=GEMINI_API_KEY)
             model = genai.GenerativeModel('gemini-1.5-pro')
             
-            # Build enhanced prompt with RAG context
             rag_context = ""
             if similar_commands:
                 rag_context = "\n\nSimilar commands from knowledge base:\n"
@@ -99,7 +96,6 @@ def generate_command_with_rag(prompt: str) -> str:
             
             generated_cmd = response.text.strip()
             
-            # Add to RAG store for future learning
             safety_level = rag_store.get_safety_level(generated_cmd)
             rag_store.add_command(
                 query=prompt,
@@ -117,7 +113,7 @@ def generate_command_with_rag(prompt: str) -> str:
 
 @click.group()
 def cli():
-    """🌟 AuroraOS - AI Terminal Assistant with RAG & Sandbox"""
+    """🌟 AI Terminal Assistant with RAG & Sandbox"""
     pass
 
 @cli.command()
@@ -128,13 +124,11 @@ def cli():
 @click.option('--show-similar', is_flag=True, help='Show similar commands from knowledge base')
 @click.option('--no-banner', is_flag=True, help='Skip banner display')
 def ask(query, execute, dry_run, sandbox, show_similar, no_banner):
-    """Generate and optionally execute commands from natural language"""
     
     if not no_banner:
         print_banner()
     
     if query:
-        # Main command execution
         user_panel = Panel(
             f"[bold white]{query}[/bold white]",
             title="[bold blue]📝 Your Request[/bold blue]",
@@ -143,15 +137,12 @@ def ask(query, execute, dry_run, sandbox, show_similar, no_banner):
         )
         console.print(user_panel)
         
-        # Show similar commands if requested
         if show_similar:
             show_similar_commands(query)
         
     try:
-        # Generate command
         cmd = generate_command_with_rag(query)
         
-        # Display generated command
         cmd_panel = Panel(
             f"[bold green]{cmd}[/bold green]",
             title="[bold yellow]⚡ Generated Command[/bold yellow]",
@@ -160,15 +151,13 @@ def ask(query, execute, dry_run, sandbox, show_similar, no_banner):
         )
         console.print(cmd_panel)
         
-        # Check safety
         is_risky, safety_level, reason = sandbox_manager.is_risky_command(cmd)
         if is_risky:
             console.print(f"[bold red]⚠️ RISKY COMMAND DETECTED[/bold red]")
             console.print(f"[yellow]Risk Level: {safety_level}/5 - {reason}[/yellow]")
         
-        # Handle execution modes
         should_execute = False
-        force_sandbox_mode = sandbox  # Store original sandbox flag
+        force_sandbox_mode = sandbox  
         
         if dry_run:
             console.print("[bold cyan]🔍 DRY RUN MODE - Command not executed[/bold cyan]")
@@ -179,7 +168,6 @@ def ask(query, execute, dry_run, sandbox, show_similar, no_banner):
                 console.print("[bold red]❌ High-risk command detected. Use --sandbox flag for safe execution.[/bold red]")
                 return
             
-            # Confirmation for execution with flags
             if not sandbox and is_risky:
                 console.print(f"\n[bold yellow]⚠️ About to execute risky command (Level {safety_level})...[/bold yellow]")
             else:
@@ -187,17 +175,13 @@ def ask(query, execute, dry_run, sandbox, show_similar, no_banner):
             
             should_execute = Confirm.ask("[bold cyan]Do you want to proceed?[/bold cyan]", default=True)
         else:
-            # Default behavior: Ask if user wants to execute
             console.print()
             should_execute = Confirm.ask("[bold cyan]🚀 Do you want to execute this command?[/bold cyan]", default=False)
         
-        # Execute if confirmed
         if should_execute:
-            # Determine execution mode
             use_sandbox = force_sandbox_mode or (is_risky and safety_level >= 3)
             
             if use_sandbox:
-                # Sandbox execution
                 console.print("\n[bold green]🔒 Executing in sandbox mode...[/bold green]")
                 result = sandbox_manager.safe_execute(cmd, force_sandbox=True)
                 
@@ -225,7 +209,6 @@ def ask(query, execute, dry_run, sandbox, show_similar, no_banner):
                 rag_store.add_to_history(query, cmd, executed=True, 
                                        success=result["execution_result"]["exit_code"] == 0)
             else:
-                # Normal execution
                 console.print("\n[bold green]🚀 Executing command...[/bold green]")
                 
                 with console.status("[bold blue]Running command...", spinner="bouncingBar"):
@@ -254,7 +237,6 @@ def ask(query, execute, dry_run, sandbox, show_similar, no_banner):
                 
                 rag_store.add_to_history(query, cmd, executed=True, success=result.returncode == 0)
         else:
-            # Execution declined
             if not dry_run:
                 console.print("[yellow]⏸️ Command execution cancelled.[/yellow]")
                 console.print("\n[dim]💡 Tip: Use -e/--execute to run automatically, -d/--dry-run to preview, or -s/--sandbox for safe execution[/dim]")
@@ -268,7 +250,6 @@ def ask(query, execute, dry_run, sandbox, show_similar, no_banner):
 @cli.command()
 @click.option('--limit', '-l', default=10, help='Number of history entries to show')
 def history(limit):
-    """📜 Show query history"""
     console.print("[bold blue]📜 Query History[/bold blue]\n")
     
     history_entries = rag_store.get_history(limit)
@@ -306,7 +287,6 @@ def history(limit):
 @click.option('--category', '-c', default="user", help='Command category')
 @click.option('--safety', '-s', default=1, type=int, help='Safety level (1-5)')
 def learn(query, command, description, category, safety):
-    """🧠 Add a command to the knowledge base"""
     rag_store.add_command(query, command, description, category, safety)
     console.print(f"[bold green]✅ Added command to knowledge base:[/bold green]")
     console.print(f"[cyan]Query:[/cyan] {query}")
@@ -316,7 +296,6 @@ def learn(query, command, description, category, safety):
 @cli.command()
 @click.argument('query')
 def search(query):
-    """🔍 Search similar commands in knowledge base"""
     similar = show_similar_commands(query, show_output=False)
     
     if similar:
@@ -327,19 +306,16 @@ def search(query):
 
 @cli.command()
 def cleanup():
-    """🧹 Clean up sandbox resources"""
     console.print("[bold blue]🧹 Cleaning up sandbox resources...[/bold blue]")
     sandbox_manager.cleanup()
     console.print("[bold green]✅ Cleanup completed![/bold green]")
 
 @cli.command()
 def stats():
-    """📊 Show knowledge base statistics"""
     stats = rag_store.get_command_statistics()
     
-    console.print("[bold blue]📊 AuroraOS Knowledge Base Statistics[/bold blue]\n")
+    console.print("[bold blue]📊 Knowledge Base Statistics[/bold blue]\n")
     
-    # Main stats panel
     main_stats = f"""[bold]Total Commands:[/bold] [green]{stats['total_commands']}[/green]
 [bold]Total Queries:[/bold] [cyan]{stats['total_queries']}[/cyan]
 [bold]Executed Queries:[/bold] [yellow]{stats['executed_queries']}[/yellow]
@@ -355,7 +331,6 @@ def stats():
     )
     console.print(panel)
     
-    # Categories table
     if stats['categories']:
         console.print("\n[bold blue]📂 Commands by Category[/bold blue]")
         
